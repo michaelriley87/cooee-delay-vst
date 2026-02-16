@@ -1,0 +1,16 @@
+# Visual Studio
+.vs/
+*.vcxproj.user
+*.pdb
+
+# JUCE build artifacts
+Cooee/Builds/
+
+# Binaries
+*.exe
+*.dll
+*.vst3
+
+# OS
+.DS_Store
+Thumbs.db
