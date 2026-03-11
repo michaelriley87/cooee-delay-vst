@@ -8,6 +8,7 @@
 
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include <cmath>
 
 //==============================================================================
 juce::AudioProcessorValueTreeState::ParameterLayout CooeeAudioProcessor::createParameterLayout()
@@ -28,6 +29,16 @@ juce::AudioProcessorValueTreeState::ParameterLayout CooeeAudioProcessor::createP
 		"mix", "Mix",
 		juce::NormalisableRange<float>(0.0f, 1.0f),
 		0.35f));
+
+	layout.add(std::make_unique<juce::AudioParameterFloat>(
+		"lowCut", "Low Cut",
+		juce::NormalisableRange<float>(20.0f, 2000.0f, 1.0f, 0.5f),
+		20.0f));
+
+	layout.add(std::make_unique<juce::AudioParameterFloat>(
+		"highCut", "High Cut",
+		juce::NormalisableRange<float>(1000.0f, 20000.0f, 1.0f, 0.5f),
+		20000.0f));
 
 	return layout;
 }
@@ -95,7 +106,6 @@ double CooeeAudioProcessor::getTailLengthSeconds() const
 int CooeeAudioProcessor::getNumPrograms()
 {
 	return 1;
-
 }
 
 int CooeeAudioProcessor::getCurrentProgram()
@@ -105,26 +115,58 @@ int CooeeAudioProcessor::getCurrentProgram()
 
 void CooeeAudioProcessor::setCurrentProgram(int index)
 {
+	juce::ignoreUnused(index);
 }
 
 const juce::String CooeeAudioProcessor::getProgramName(int index)
 {
+	juce::ignoreUnused(index);
 	return {};
 }
 
 void CooeeAudioProcessor::changeProgramName(int index, const juce::String& newName)
 {
+	juce::ignoreUnused(index, newName);
 }
 
 //==============================================================================
 void CooeeAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
+	juce::ignoreUnused(samplesPerBlock);
+
+	currentSampleRate = sampleRate;
+
+	const int totalNumChannels = getTotalNumOutputChannels();
+
+	lowCutFilters.clear();
+	highCutFilters.clear();
+
+	lowCutFilters.resize(totalNumChannels);
+	highCutFilters.resize(totalNumChannels);
+
+	juce::dsp::ProcessSpec spec;
+	spec.sampleRate = sampleRate;
+	spec.maximumBlockSize = static_cast<juce::uint32>(samplesPerBlock);
+	spec.numChannels = 1;
+
+	for (int ch = 0; ch < totalNumChannels; ++ch)
+	{
+		lowCutFilters[ch].reset();
+		highCutFilters[ch].reset();
+
+		lowCutFilters[ch].setType(juce::dsp::StateVariableTPTFilterType::highpass);
+		highCutFilters[ch].setType(juce::dsp::StateVariableTPTFilterType::lowpass);
+
+		lowCutFilters[ch].prepare(spec);
+		highCutFilters[ch].prepare(spec);
+	}
+
 	maxDelaySamples = static_cast<int>(sampleRate * 2.0);
 
 	delayBuffer.clear();
-	delayBuffer.resize(getTotalNumOutputChannels());
+	delayBuffer.resize(totalNumChannels);
 
-	for (int ch = 0; ch < getTotalNumOutputChannels(); ++ch)
+	for (int ch = 0; ch < totalNumChannels; ++ch)
 		delayBuffer[ch].assign(maxDelaySamples, 0.0f);
 
 	writePosition = 0;
@@ -160,17 +202,22 @@ void CooeeAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
 	juce::ignoreUnused(midiMessages);
 	juce::ScopedNoDenormals noDenormals;
 
-	auto totalNumInputChannels = getTotalNumInputChannels();
-	auto totalNumOutputChannels = getTotalNumOutputChannels();
+	const int totalNumInputChannels = getTotalNumInputChannels();
+	const int totalNumOutputChannels = getTotalNumOutputChannels();
+	const int numSamples = buffer.getNumSamples();
 
 	for (int i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
-		buffer.clear(i, 0, buffer.getNumSamples());
+		buffer.clear(i, 0, numSamples);
 
 	const float timeMs = *parameters.getRawParameterValue("time");
 	const float feedback = *parameters.getRawParameterValue("feedback");
-	const float mix = *parameters.getRawParameterValue("mix");
+	const float mix = *parameters.getRawParameterValue("mix"); 
+	float lowCutHz = *parameters.getRawParameterValue("lowCut");
+	float highCutHz = *parameters.getRawParameterValue("highCut");
 
-	const int numSamples = buffer.getNumSamples();
+	const float nyquist = static_cast<float>(currentSampleRate * 0.5);
+	highCutHz = juce::jlimit(1000.0f, nyquist - 100.0f, highCutHz);
+	lowCutHz = juce::jlimit(20.0f, highCutHz - 50.0f, lowCutHz);
 
 	int delaySamples = static_cast<int>((timeMs / 1000.0f) * getSampleRate());
 	delaySamples = juce::jlimit(1, maxDelaySamples - 1, delaySamples);
@@ -179,6 +226,9 @@ void CooeeAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
 
 	for (int ch = 0; ch < totalNumInputChannels; ++ch)
 	{
+		lowCutFilters[ch].setCutoffFrequency(lowCutHz);
+		highCutFilters[ch].setCutoffFrequency(highCutHz);
+
 		auto* channelData = buffer.getWritePointer(ch);
 		auto& d = delayBuffer[ch];
 
@@ -187,19 +237,31 @@ void CooeeAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
 		for (int n = 0; n < numSamples; ++n)
 		{
 			int readPos = write - delaySamples;
-			if (readPos < 0) readPos += maxDelaySamples;
+			if (readPos < 0)
+				readPos += maxDelaySamples;
 
 			const float delayed = d[readPos];
 			const float in = channelData[n];
 
-			d[write] = in + delayed * feedback;
-			channelData[n] = in * (1.0f - mix) + delayed * mix;
+			float feedbackSignal = delayed * feedback;
+			feedbackSignal = lowCutFilters[ch].processSample(0, feedbackSignal);
+			feedbackSignal = highCutFilters[ch].processSample(0, feedbackSignal);
+
+			if (!std::isfinite(feedbackSignal))
+				feedbackSignal = 0.0f;
+
+			const float writeSample = in + feedbackSignal;
+			d[write] = std::isfinite(writeSample) ? writeSample : 0.0f;
+
+			const float output = in * (1.0f - mix) + delayed * mix;
+			channelData[n] = std::isfinite(output) ? output : 0.0f;
 
 			++write;
 			if (write >= maxDelaySamples)
 				write = 0;
 		}
 	}
+
 	writePosition += numSamples;
 	writePosition %= maxDelaySamples;
 }
@@ -218,10 +280,12 @@ juce::AudioProcessorEditor* CooeeAudioProcessor::createEditor()
 //==============================================================================
 void CooeeAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
+	juce::ignoreUnused(destData);
 }
 
 void CooeeAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
+	juce::ignoreUnused(data, sizeInBytes);
 }
 
 //==============================================================================

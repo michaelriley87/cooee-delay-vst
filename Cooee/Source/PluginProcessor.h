@@ -9,6 +9,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include <juce_dsp/juce_dsp.h>
 #include <vector>
 
 //==============================================================================
@@ -59,9 +60,12 @@ public:
 
 private:
 	//==============================================================================
-	std::vector<std::vector<float>> delayBuffer;
+	std::vector<std::vector<float>> delayBuffer; 
+	std::vector<juce::dsp::StateVariableTPTFilter<float>> lowCutFilters;
+	std::vector<juce::dsp::StateVariableTPTFilter<float>> highCutFilters;
 	int writePosition = 0;
 	int maxDelaySamples = 0;
+	double currentSampleRate = 44100.0;
 
 	//==============================================================================
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CooeeAudioProcessor)

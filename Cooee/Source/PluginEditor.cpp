@@ -28,24 +28,34 @@ CooeeAudioProcessorEditor::CooeeAudioProcessorEditor(CooeeAudioProcessor& p)
 	configureKnob(timeSlider);
 	configureKnob(feedbackSlider);
 	configureKnob(mixSlider);
+	configureKnob(lowCutSlider);
+	configureKnob(highCutSlider);
 
 	configureLabel(timeLabel, "Time (ms)");
 	configureLabel(feedbackLabel, "Feedback");
 	configureLabel(mixLabel, "Mix");
+	configureLabel(lowCutLabel, "Low Cut");
+	configureLabel(highCutLabel, "High Cut");
 
 	addAndMakeVisible(timeSlider);
 	addAndMakeVisible(feedbackSlider);
 	addAndMakeVisible(mixSlider);
+	addAndMakeVisible(lowCutSlider);
+	addAndMakeVisible(highCutSlider);
 
 	addAndMakeVisible(timeLabel);
 	addAndMakeVisible(feedbackLabel);
 	addAndMakeVisible(mixLabel);
+	addAndMakeVisible(lowCutLabel);
+	addAndMakeVisible(highCutLabel);
 
 	timeAttachment = std::make_unique<Attachment>(audioProcessor.parameters, "time", timeSlider);
 	feedbackAttachment = std::make_unique<Attachment>(audioProcessor.parameters, "feedback", feedbackSlider);
 	mixAttachment = std::make_unique<Attachment>(audioProcessor.parameters, "mix", mixSlider);
+	lowCutAttachment = std::make_unique<Attachment>(audioProcessor.parameters, "lowCut", lowCutSlider);
+	highCutAttachment = std::make_unique<Attachment>(audioProcessor.parameters, "highCut", highCutSlider);
 
-	setSize(420, 180);
+	setSize(700, 180);
 }
 
 void CooeeAudioProcessorEditor::paint(juce::Graphics& g)
@@ -57,11 +67,13 @@ void CooeeAudioProcessorEditor::resized()
 {
 	auto area = getLocalBounds().reduced(20);
 
-	const int colW = area.getWidth() / 3;
+	const int colW = area.getWidth() / 5;
 
 	auto c1 = area.removeFromLeft(colW);
 	auto c2 = area.removeFromLeft(colW);
-	auto c3 = area;
+	auto c3 = area.removeFromLeft(colW);
+	auto c4 = area.removeFromLeft(colW);
+	auto c5 = area;
 
 	const int labelH = 20;
 	const int knobH = 120;
@@ -74,4 +86,10 @@ void CooeeAudioProcessorEditor::resized()
 
 	mixLabel.setBounds(c3.removeFromTop(labelH));
 	mixSlider.setBounds(c3.removeFromTop(knobH));
+
+	lowCutLabel.setBounds(c4.removeFromTop(labelH));
+	lowCutSlider.setBounds(c4.removeFromTop(knobH));
+
+	highCutLabel.setBounds(c5.removeFromTop(labelH));
+	highCutSlider.setBounds(c5.removeFromTop(knobH));
 }
