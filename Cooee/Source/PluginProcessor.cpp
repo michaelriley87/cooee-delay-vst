@@ -211,7 +211,7 @@ void CooeeAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
 
 	const float timeMs = *parameters.getRawParameterValue("time");
 	const float feedback = *parameters.getRawParameterValue("feedback");
-	const float mix = *parameters.getRawParameterValue("mix"); 
+	const float mix = *parameters.getRawParameterValue("mix");
 	float lowCutHz = *parameters.getRawParameterValue("lowCut");
 	float highCutHz = *parameters.getRawParameterValue("highCut");
 

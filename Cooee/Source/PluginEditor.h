@@ -15,7 +15,7 @@ class CooeeAudioProcessorEditor : public juce::AudioProcessorEditor
 {
 public:
 	explicit CooeeAudioProcessorEditor(CooeeAudioProcessor&);
-	~CooeeAudioProcessorEditor() override = default;
+	~CooeeAudioProcessorEditor() override;
 
 	void paint(juce::Graphics&) override;
 	void resized() override;

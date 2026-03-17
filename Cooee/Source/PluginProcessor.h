@@ -60,7 +60,7 @@ public:
 
 private:
 	//==============================================================================
-	std::vector<std::vector<float>> delayBuffer; 
+	std::vector<std::vector<float>> delayBuffer;
 	std::vector<juce::dsp::StateVariableTPTFilter<float>> lowCutFilters;
 	std::vector<juce::dsp::StateVariableTPTFilter<float>> highCutFilters;
 	int writePosition = 0;

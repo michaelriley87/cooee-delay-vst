@@ -5,6 +5,10 @@
               pluginVST3Category="Delay">
   <MAINGROUP id="U6aryp" name="Cooee">
     <GROUP id="{9D9E2467-ADD8-6531-5815-A5885AB3A8E7}" name="Source">
+      <FILE id="cfygmv" name="BebasNeue-Regular.ttf" compile="0" resource="1"
+            file="Source/Assets/BebasNeue-Regular.ttf"/>
+      <FILE id="qegovS" name="Montserrat-VariableFont_wght.ttf" compile="0"
+            resource="1" file="Source/Assets/Montserrat-VariableFont_wght.ttf"/>
       <FILE id="Hdfljy" name="PluginProcessor.cpp" compile="1" resource="0"
             file="Source/PluginProcessor.cpp"/>
       <FILE id="hH0IkC" name="PluginProcessor.h" compile="0" resource="0"
