@@ -280,12 +280,19 @@ juce::AudioProcessorEditor* CooeeAudioProcessor::createEditor()
 //==============================================================================
 void CooeeAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
-	juce::ignoreUnused(destData);
+	auto state = parameters.copyState();
+	std::unique_ptr<juce::XmlElement> xml(state.createXml());
+	copyXmlToBinary(*xml, destData);
 }
 
 void CooeeAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
-	juce::ignoreUnused(data, sizeInBytes);
+	std::unique_ptr<juce::XmlElement> xml(getXmlFromBinary(data, sizeInBytes));
+
+	if (xml && xml->hasTagName(parameters.state.getType()))
+	{
+		parameters.replaceState(juce::ValueTree::fromXml(*xml));
+	}
 }
 
 //==============================================================================

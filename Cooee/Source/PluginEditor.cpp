@@ -67,7 +67,7 @@ public:
 
 		float angle = rotaryStartAngle + sliderPos * (rotaryEndAngle - rotaryStartAngle);
 
-		g.setColour(juce::Colour(0xff11823b));
+		g.setColour(juce::Colour(0xff004d25));
 		g.fillEllipse(bounds);
 
 		juce::Path indicator;
