@@ -11,7 +11,7 @@
 
 static juce::Font makeMontserratFont(float height, bool bold)
 {
-	auto typeface = juce::Typeface::createSystemTypefaceFor(
+	static auto typeface = juce::Typeface::createSystemTypefaceFor(
 		BinaryData::MontserratVariableFont_wght_ttf,
 		BinaryData::MontserratVariableFont_wght_ttfSize
 	);
@@ -24,7 +24,7 @@ static juce::Font makeMontserratFont(float height, bool bold)
 
 static juce::Font makeBebasFont(float height)
 {
-	auto typeface = juce::Typeface::createSystemTypefaceFor(
+	static auto typeface = juce::Typeface::createSystemTypefaceFor(
 		BinaryData::BebasNeueRegular_ttf,
 		BinaryData::BebasNeueRegular_ttfSize
 	);

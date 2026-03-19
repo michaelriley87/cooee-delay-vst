@@ -250,7 +250,7 @@ void CooeeAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
 			if (!std::isfinite(feedbackSignal))
 				feedbackSignal = 0.0f;
 
-			const float writeSample = in + feedbackSignal;
+			const float writeSample = juce::jlimit(-1.0f, 1.0f, in + feedbackSignal);
 			d[write] = std::isfinite(writeSample) ? writeSample : 0.0f;
 
 			const float output = in * (1.0f - mix) + delayed * mix;
