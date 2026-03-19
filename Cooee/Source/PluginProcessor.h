@@ -59,13 +59,23 @@ public:
 	static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
 private:
+
 	//==============================================================================
 	std::vector<std::vector<float>> delayBuffer;
 	std::vector<juce::dsp::StateVariableTPTFilter<float>> lowCutFilters;
 	std::vector<juce::dsp::StateVariableTPTFilter<float>> highCutFilters;
+
+	//==============================================================================
 	int writePosition = 0;
 	int maxDelaySamples = 0;
 	double currentSampleRate = 44100.0;
+
+	//==============================================================================
+	juce::SmoothedValue<float> smoothedTime;
+	juce::SmoothedValue<float> smoothedFeedback;
+	juce::SmoothedValue<float> smoothedMix;
+	juce::SmoothedValue<float> smoothedLowCut;
+	juce::SmoothedValue<float> smoothedHighCut;
 
 	//==============================================================================
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CooeeAudioProcessor)

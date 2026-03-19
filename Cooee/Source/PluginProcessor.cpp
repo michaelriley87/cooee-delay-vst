@@ -135,7 +135,6 @@ void CooeeAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 	juce::ignoreUnused(samplesPerBlock);
 
 	currentSampleRate = sampleRate;
-
 	const int totalNumChannels = getTotalNumOutputChannels();
 
 	lowCutFilters.clear();
@@ -146,7 +145,7 @@ void CooeeAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 
 	juce::dsp::ProcessSpec spec;
 	spec.sampleRate = sampleRate;
-	spec.maximumBlockSize = static_cast<juce::uint32>(samplesPerBlock);
+	spec.maximumBlockSize = (juce::uint32)samplesPerBlock;
 	spec.numChannels = 1;
 
 	for (int ch = 0; ch < totalNumChannels; ++ch)
@@ -161,7 +160,7 @@ void CooeeAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 		highCutFilters[ch].prepare(spec);
 	}
 
-	maxDelaySamples = static_cast<int>(sampleRate * 2.0);
+	maxDelaySamples = (int)(sampleRate * 2.0);
 
 	delayBuffer.clear();
 	delayBuffer.resize(totalNumChannels);
@@ -170,6 +169,21 @@ void CooeeAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 		delayBuffer[ch].assign(maxDelaySamples, 0.0f);
 
 	writePosition = 0;
+
+	// === SMOOTHING INIT ===
+	const double rampTime = 0.02;
+
+	smoothedTime.reset(sampleRate, rampTime);
+	smoothedFeedback.reset(sampleRate, rampTime);
+	smoothedMix.reset(sampleRate, rampTime);
+	smoothedLowCut.reset(sampleRate, rampTime);
+	smoothedHighCut.reset(sampleRate, rampTime);
+
+	smoothedTime.setCurrentAndTargetValue(*parameters.getRawParameterValue("time"));
+	smoothedFeedback.setCurrentAndTargetValue(*parameters.getRawParameterValue("feedback"));
+	smoothedMix.setCurrentAndTargetValue(*parameters.getRawParameterValue("mix"));
+	smoothedLowCut.setCurrentAndTargetValue(*parameters.getRawParameterValue("lowCut"));
+	smoothedHighCut.setCurrentAndTargetValue(*parameters.getRawParameterValue("highCut"));
 }
 
 void CooeeAudioProcessor::releaseResources()
@@ -209,26 +223,16 @@ void CooeeAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
 	for (int i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
 		buffer.clear(i, 0, numSamples);
 
-	const float timeMs = *parameters.getRawParameterValue("time");
-	const float feedback = *parameters.getRawParameterValue("feedback");
-	const float mix = *parameters.getRawParameterValue("mix");
-	float lowCutHz = *parameters.getRawParameterValue("lowCut");
-	float highCutHz = *parameters.getRawParameterValue("highCut");
-
-	const float nyquist = static_cast<float>(currentSampleRate * 0.5);
-	highCutHz = juce::jlimit(1000.0f, nyquist - 100.0f, highCutHz);
-	lowCutHz = juce::jlimit(20.0f, highCutHz - 50.0f, lowCutHz);
-
-	int delaySamples = static_cast<int>((timeMs / 1000.0f) * getSampleRate());
-	delaySamples = juce::jlimit(1, maxDelaySamples - 1, delaySamples);
+	smoothedTime.setTargetValue(*parameters.getRawParameterValue("time"));
+	smoothedFeedback.setTargetValue(*parameters.getRawParameterValue("feedback"));
+	smoothedMix.setTargetValue(*parameters.getRawParameterValue("mix"));
+	smoothedLowCut.setTargetValue(*parameters.getRawParameterValue("lowCut"));
+	smoothedHighCut.setTargetValue(*parameters.getRawParameterValue("highCut"));
 
 	const int startWrite = writePosition;
 
 	for (int ch = 0; ch < totalNumInputChannels; ++ch)
 	{
-		lowCutFilters[ch].setCutoffFrequency(lowCutHz);
-		highCutFilters[ch].setCutoffFrequency(highCutHz);
-
 		auto* channelData = buffer.getWritePointer(ch);
 		auto& d = delayBuffer[ch];
 
@@ -236,12 +240,29 @@ void CooeeAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
 
 		for (int n = 0; n < numSamples; ++n)
 		{
+			float timeMs = smoothedTime.getNextValue();
+			float feedback = smoothedFeedback.getNextValue();
+			float mix = smoothedMix.getNextValue();
+			float lowCutHz = smoothedLowCut.getNextValue();
+			float highCutHz = smoothedHighCut.getNextValue();
+
+			const float nyquist = (float)(currentSampleRate * 0.5);
+
+			highCutHz = juce::jlimit(1000.0f, nyquist - 100.0f, highCutHz);
+			lowCutHz = juce::jlimit(20.0f, highCutHz - 50.0f, lowCutHz);
+
+			int delaySamples = (int)((timeMs / 1000.0f) * getSampleRate());
+			delaySamples = juce::jlimit(1, maxDelaySamples - 1, delaySamples);
+
 			int readPos = write - delaySamples;
 			if (readPos < 0)
 				readPos += maxDelaySamples;
 
 			const float delayed = d[readPos];
 			const float in = channelData[n];
+
+			lowCutFilters[ch].setCutoffFrequency(lowCutHz);
+			highCutFilters[ch].setCutoffFrequency(highCutHz);
 
 			float feedbackSignal = delayed * feedback;
 			feedbackSignal = lowCutFilters[ch].processSample(0, feedbackSignal);
