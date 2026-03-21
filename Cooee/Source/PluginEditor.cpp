@@ -114,6 +114,12 @@ CooeeAudioProcessorEditor::CooeeAudioProcessorEditor(CooeeAudioProcessor& p)
 	configureKnob(lowCutSlider);
 	configureKnob(highCutSlider);
 
+	timeSlider.setTextValueSuffix(" ms");
+	feedbackSlider.setTextValueSuffix(" %");
+	mixSlider.setTextValueSuffix(" %");
+	lowCutSlider.setTextValueSuffix(" Hz");
+	highCutSlider.setTextValueSuffix(" Hz");
+
 	configureLabel(timeLabel, "Time");
 	configureLabel(feedbackLabel, "Feedback");
 	configureLabel(mixLabel, "Mix");

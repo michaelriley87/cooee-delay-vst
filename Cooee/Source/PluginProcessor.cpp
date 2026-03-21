@@ -17,18 +17,18 @@ juce::AudioProcessorValueTreeState::ParameterLayout CooeeAudioProcessor::createP
 
 	layout.add(std::make_unique<juce::AudioParameterFloat>(
 		"time", "Time (ms)",
-		juce::NormalisableRange<float>(1.0f, 2000.0f, 0.0f, 0.5f),
+		juce::NormalisableRange<float>(1.0f, 2000.0f, 1.0f),
 		400.0f));
 
 	layout.add(std::make_unique<juce::AudioParameterFloat>(
 		"feedback", "Feedback",
-		juce::NormalisableRange<float>(0.0f, 0.95f),
-		0.35f));
+		juce::NormalisableRange<float>(0.0f, 95.0f, 1.0f),
+		35.0f));
 
 	layout.add(std::make_unique<juce::AudioParameterFloat>(
 		"mix", "Mix",
-		juce::NormalisableRange<float>(0.0f, 1.0f),
-		0.35f));
+		juce::NormalisableRange<float>(0.0f, 100.0f, 1.0f),
+		35.0f));
 
 	layout.add(std::make_unique<juce::AudioParameterFloat>(
 		"lowCut", "Low Cut",
@@ -170,7 +170,6 @@ void CooeeAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 
 	writePosition = 0;
 
-	// === SMOOTHING INIT ===
 	const double rampTime = 0.02;
 
 	smoothedTime.reset(sampleRate, rampTime);
@@ -241,8 +240,8 @@ void CooeeAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
 		for (int n = 0; n < numSamples; ++n)
 		{
 			float timeMs = smoothedTime.getNextValue();
-			float feedback = smoothedFeedback.getNextValue();
-			float mix = smoothedMix.getNextValue();
+			float feedback = smoothedFeedback.getNextValue() * 0.01f;
+			float mix = smoothedMix.getNextValue() * 0.01f;
 			float lowCutHz = smoothedLowCut.getNextValue();
 			float highCutHz = smoothedHighCut.getNextValue();
 
