@@ -266,6 +266,7 @@ void CooeeAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
 			float feedbackSignal = delayed * feedback;
 			feedbackSignal = lowCutFilters[ch].processSample(0, feedbackSignal);
 			feedbackSignal = highCutFilters[ch].processSample(0, feedbackSignal);
+			feedbackSignal = std::tanh(feedbackSignal);
 
 			if (!std::isfinite(feedbackSignal))
 				feedbackSignal = 0.0f;
