@@ -125,6 +125,7 @@ CooeeAudioProcessorEditor::CooeeAudioProcessorEditor(CooeeAudioProcessor& p)
 	configureLabel(mixLabel, "Mix");
 	configureLabel(lowCutLabel, "Low Cut");
 	configureLabel(highCutLabel, "High Cut");
+	configureLabel(syncLabel, "Sync");
 
 	addAndMakeVisible(timeSlider);
 	addAndMakeVisible(feedbackSlider);
@@ -138,16 +139,57 @@ CooeeAudioProcessorEditor::CooeeAudioProcessorEditor(CooeeAudioProcessor& p)
 	addAndMakeVisible(lowCutLabel);
 	addAndMakeVisible(highCutLabel);
 
-	timeAttachment = std::make_unique<Attachment>(audioProcessor.parameters, "time", timeSlider);
-	feedbackAttachment = std::make_unique<Attachment>(audioProcessor.parameters, "feedback", feedbackSlider);
-	mixAttachment = std::make_unique<Attachment>(audioProcessor.parameters, "mix", mixSlider);
-	lowCutAttachment = std::make_unique<Attachment>(audioProcessor.parameters, "lowCut", lowCutSlider);
-	highCutAttachment = std::make_unique<Attachment>(audioProcessor.parameters, "highCut", highCutSlider);
+	addAndMakeVisible(syncLabel);
+	addAndMakeVisible(syncButton);
+	addAndMakeVisible(divisionBox);
+
+	syncButton.setButtonText("SYNC");
+	syncButton.setClickingTogglesState(true);
+	syncButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff00331a));
+	syncButton.setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xff6fff7a));
+	syncButton.setColour(juce::TextButton::textColourOffId, juce::Colours::white);
+	syncButton.setColour(juce::TextButton::textColourOnId, juce::Colours::black);
+
+	divisionBox.addItem("1/4", 1);
+	divisionBox.addItem("1/8", 2);
+	divisionBox.addItem("1/16", 3);
+
+	timeAttachment = std::make_unique<SliderAttachment>(audioProcessor.parameters, "time", timeSlider);
+	feedbackAttachment = std::make_unique<SliderAttachment>(audioProcessor.parameters, "feedback", feedbackSlider);
+	mixAttachment = std::make_unique<SliderAttachment>(audioProcessor.parameters, "mix", mixSlider);
+	lowCutAttachment = std::make_unique<SliderAttachment>(audioProcessor.parameters, "lowCut", lowCutSlider);
+	highCutAttachment = std::make_unique<SliderAttachment>(audioProcessor.parameters, "highCut", highCutSlider);
+
+	syncAttachment = std::make_unique<ButtonAttachment>(audioProcessor.parameters, "sync", syncButton);
+	divisionAttachment = std::make_unique<ComboBoxAttachment>(audioProcessor.parameters, "division", divisionBox);
+
+	syncButton.onClick = [this]
+		{
+			updateSyncUiState();
+		};
+
+	updateSyncUiState();
+	startTimerHz(20);
 
 	setSize(900, 320);
 }
 
-CooeeAudioProcessorEditor::~CooeeAudioProcessorEditor() {}
+CooeeAudioProcessorEditor::~CooeeAudioProcessorEditor()
+{
+	stopTimer();
+}
+
+void CooeeAudioProcessorEditor::updateSyncUiState()
+{
+	const bool syncEnabled = syncButton.getToggleState();
+	timeSlider.setEnabled(!syncEnabled);
+	divisionBox.setEnabled(syncEnabled);
+}
+
+void CooeeAudioProcessorEditor::timerCallback()
+{
+	updateSyncUiState();
+}
 
 void CooeeAudioProcessorEditor::paint(juce::Graphics& g)
 {
@@ -194,13 +236,18 @@ void CooeeAudioProcessorEditor::resized()
 	area.removeFromTop(100);
 
 	int knobSize = 120;
-	int spacing = (area.getWidth() - knobSize * 5) / 4;
+	int spacing = (area.getWidth() - knobSize * 6) / 5;
 
 	int x = area.getX();
 	int y = area.getY();
 
 	timeLabel.setBounds(x, y - 30, knobSize, 25);
 	timeSlider.setBounds(x, y, knobSize, knobSize);
+	x += knobSize + spacing;
+
+	syncLabel.setBounds(x, y - 30, knobSize, 25);
+	syncButton.setBounds(x + 10, y + 25, knobSize - 20, 25);
+	divisionBox.setBounds(x + 10, y + 60, knobSize - 20, 25);
 	x += knobSize + spacing;
 
 	feedbackLabel.setBounds(x, y - 30, knobSize, 25);

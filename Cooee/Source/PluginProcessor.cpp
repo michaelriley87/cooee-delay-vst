@@ -40,6 +40,14 @@ juce::AudioProcessorValueTreeState::ParameterLayout CooeeAudioProcessor::createP
 		juce::NormalisableRange<float>(1000.0f, 20000.0f, 1.0f, 0.5f),
 		20000.0f));
 
+	layout.add(std::make_unique<juce::AudioParameterBool>(
+		"sync", "Sync", false));
+
+	layout.add(std::make_unique<juce::AudioParameterChoice>(
+		"division", "Division",
+		juce::StringArray{ "1/4", "1/8", "1/16" },
+		1));
+
 	return layout;
 }
 
@@ -100,7 +108,7 @@ bool CooeeAudioProcessor::isMidiEffect() const
 
 double CooeeAudioProcessor::getTailLengthSeconds() const
 {
-	return 0.0;
+	return 2.0;
 }
 
 int CooeeAudioProcessor::getNumPrograms()
@@ -132,8 +140,6 @@ void CooeeAudioProcessor::changeProgramName(int index, const juce::String& newNa
 //==============================================================================
 void CooeeAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
-	juce::ignoreUnused(samplesPerBlock);
-
 	currentSampleRate = sampleRate;
 	const int totalNumChannels = getTotalNumOutputChannels();
 
@@ -145,7 +151,7 @@ void CooeeAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 
 	juce::dsp::ProcessSpec spec;
 	spec.sampleRate = sampleRate;
-	spec.maximumBlockSize = (juce::uint32)samplesPerBlock;
+	spec.maximumBlockSize = static_cast<juce::uint32>(samplesPerBlock);
 	spec.numChannels = 1;
 
 	for (int ch = 0; ch < totalNumChannels; ++ch)
@@ -160,7 +166,7 @@ void CooeeAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 		highCutFilters[ch].prepare(spec);
 	}
 
-	maxDelaySamples = (int)(sampleRate * 2.0);
+	maxDelaySamples = static_cast<int>(sampleRate * 2.0);
 
 	delayBuffer.clear();
 	delayBuffer.resize(totalNumChannels);
@@ -210,6 +216,22 @@ bool CooeeAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) con
 }
 #endif
 
+float CooeeAudioProcessor::getSyncedTimeMs(double bpm, int divisionIndex) const
+{
+	if (bpm <= 0.0)
+		bpm = 120.0;
+
+	const float quarterMs = 60000.0f / static_cast<float>(bpm);
+
+	switch (divisionIndex)
+	{
+	case 0: return quarterMs;         // 1/4
+	case 1: return quarterMs * 0.5f;  // 1/8
+	case 2: return quarterMs * 0.25f; // 1/16
+	default: return quarterMs * 0.5f; // default to 1/8
+	}
+}
+
 void CooeeAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
 	juce::ignoreUnused(midiMessages);
@@ -228,6 +250,17 @@ void CooeeAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
 	smoothedLowCut.setTargetValue(*parameters.getRawParameterValue("lowCut"));
 	smoothedHighCut.setTargetValue(*parameters.getRawParameterValue("highCut"));
 
+	bool syncEnabled = parameters.getRawParameterValue("sync")->load() > 0.5f;
+	int divisionIndex = static_cast<int>(parameters.getRawParameterValue("division")->load());
+
+	double bpm = 120.0;
+	if (auto* playHead = getPlayHead())
+	{
+		juce::AudioPlayHead::CurrentPositionInfo positionInfo;
+		if (playHead->getCurrentPosition(positionInfo) && positionInfo.bpm > 0.0)
+			bpm = positionInfo.bpm;
+	}
+
 	const int startWrite = writePosition;
 
 	for (int ch = 0; ch < totalNumInputChannels; ++ch)
@@ -239,18 +272,21 @@ void CooeeAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
 
 		for (int n = 0; n < numSamples; ++n)
 		{
-			float timeMs = smoothedTime.getNextValue();
+			float timeMs = syncEnabled
+				? getSyncedTimeMs(bpm, divisionIndex)
+				: smoothedTime.getNextValue();
+
 			float feedback = smoothedFeedback.getNextValue() * 0.01f;
 			float mix = smoothedMix.getNextValue() * 0.01f;
 			float lowCutHz = smoothedLowCut.getNextValue();
 			float highCutHz = smoothedHighCut.getNextValue();
 
-			const float nyquist = (float)(currentSampleRate * 0.5);
+			const float nyquist = static_cast<float>(currentSampleRate * 0.5);
 
 			highCutHz = juce::jlimit(1000.0f, nyquist - 100.0f, highCutHz);
 			lowCutHz = juce::jlimit(20.0f, highCutHz - 50.0f, lowCutHz);
 
-			int delaySamples = (int)((timeMs / 1000.0f) * getSampleRate());
+			int delaySamples = static_cast<int>((timeMs / 1000.0f) * getSampleRate());
 			delaySamples = juce::jlimit(1, maxDelaySamples - 1, delaySamples);
 
 			int readPos = write - delaySamples;
@@ -311,9 +347,7 @@ void CooeeAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
 	std::unique_ptr<juce::XmlElement> xml(getXmlFromBinary(data, sizeInBytes));
 
 	if (xml && xml->hasTagName(parameters.state.getType()))
-	{
 		parameters.replaceState(juce::ValueTree::fromXml(*xml));
-	}
 }
 
 //==============================================================================
